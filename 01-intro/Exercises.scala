@@ -10,7 +10,7 @@ object MyModule:
   // Exercise 1
 
   def square(n: Int): Int =
-    ???
+    n * n
 
   private def formatAbs(x: Int): String =
     s"The absolute value of ${x} is ${abs(x)}"
@@ -21,6 +21,7 @@ object MyModule:
   @main def printAbs: Unit =
     assert(magic - 84 == magic.-(84))
     println(formatAbs(magic - 100))
+    println(square(magic - 100))
 
 end MyModule
 
@@ -29,30 +30,36 @@ end MyModule
 // Exercise 3
 
 def fib(n: Int): Int =
-  ???
+  if n == 1 then 0
+  else if n == 2 then 1
+  else fib(n - 1) + fib(n - 2)
 
 // Exercise 4
 
 def isSorted[A](as: Array[A], ordered: (A, A) => Boolean): Boolean =
-  ???
+  def loop(n: Int): Boolean =
+    if n >= as.length - 1 then true
+    else if !ordered(as(n), as(n + 1)) then false
+    else loop(n + 1)
+  loop(0)
 
 // Exercise 5
 
 def curry[A, B, C](f: (A, B) => C): A => (B => C) =
-  ???
+  (x : A) => (y : B) => f(x, y)
 
 def isSortedCurried[A]: Array[A] => ((A, A) => Boolean) => Boolean =
-  ???
+  curry(isSorted)
 
 // Exercise 6
 
 def uncurry[A, B, C](f: A => B => C): (A, B) => C =
-  ???
+  (x : A, y : B) => f(x)(y)
 
 def isSortedCurriedUncurried[A]: (Array[A], (A, A) => Boolean) => Boolean =
-  ???
+  uncurry(isSortedCurried)
 
 // Exercise 7
 
 def compose[A, B, C](f: B => C, g: A => B): A => C =
-  ???
+  (x : A) => f(g(x))
