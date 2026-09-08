@@ -30,9 +30,11 @@ end MyModule
 // Exercise 3
 
 def fib(n: Int): Int =
-  if n == 1 then 0
-  else if n == 2 then 1
-  else fib(n - 1) + fib(n - 2)
+  @annotation.tailrec
+  def loop(count: Int, current: Int, next: Int): Int =
+    if count == 1 then current // not plus one, since we basicly do that the first time
+    else loop(count - 1, next, current + next)
+  loop(n, 0, 1)
 
 // Exercise 4
 
