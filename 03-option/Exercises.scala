@@ -76,37 +76,46 @@ enum Option[+A]:
 
   // Exercise 6
 
-  def map[B](f: A => B): Option[B] = ???
+  def map[B](f: A => B): Option[B] = this match
+  case None => None
+  case Some(value) => Some(f(value))
 
-  def getOrElse[B >: A] (default: => B): B = ???
+  def getOrElse[B >: A] (default: => B): B = this match
+  case None => default
+  case Some(value) => value
 
-  def flatMap[B](f: A => Option[B]): Option[B] =  ???
+  def flatMap[B](f: A => Option[B]): Option[B] =  this match
+  case None => None
+  case Some(value) => f(value)
 
-  def filter(p: A => Boolean): Option[A] = ???
+  def filter(p: A => Boolean): Option[A] = this match
+  case None => None
+  case Some(value) => if p(value) then Some(value) else None
 
   // Scroll down for Exercise 7, in the bottom of the file, outside Option
 
   def forAll(p: A => Boolean): Boolean = this match
     case None => true
-    case Some(a) => p(a)
+    case Some(x) => p(x)
 
 end Option
 
 // Exercise 9
 
 def map2[A, B, C](ao: Option[A], bo: Option[B])(f: (A,B) => C): Option[C] =
-  ???
+  for
+    x <- ao
+    y <- bo
+  yield
+    f(x,y)
 
 // Exercise 10
 
-def sequence[A](aos: List[Option[A]]): Option[List[A]] =
-  ???
+def sequence[A](aos: List[Option[A]]): Option[List[A]] =  aos.foldRight[Option[List[A]]](Some(Nil)) ((elem,list) => map2(elem,list)((x,y) => x::y))
 
 // Exercise 11
 
-def traverse[A, B](as: List[A])(f: A => Option[B]): Option[List[B]] =
-  ???
-
+def traverse[A, B](as: List[A])(f: A => Option[B]): Option[List[B]] = as.foldRight[Option[List[B]]](Some(Nil)) ((elem,list) => map2(f(elem),list)((x,y) => x::y))
 
 
 
@@ -120,11 +129,13 @@ def headOption[A](lst: List[A]): Option[A] = lst match
 
 // Exercise 7
 
-def headGrade(lst: List[(String,Int)]): Option[Int] =
-  ???
+def headGrade(lst: List[(String,Int)]): Option[Int] = headOption(lst).map(x => x._2)
 
 def headGrade1(lst: List[(String,Int)]): Option[Int] =
-  ???
+  for 
+    x <- headOption(lst)
+  yield 
+    x._2
 
 // Implemented in the text book
 
@@ -134,7 +145,14 @@ def mean(xs: Seq[Double]): Option[Double] =
 
 // Exercise 8
 
-def variance(xs: Seq[Double]): Option[Double] =
-  ???
+def variance(xs: Seq[Double]): Option[Double] = mean(xs).flatMap(x => mean(xs.map(y => (y-x)*(y-x))))
 
+def variance1(xs: Seq[Double]): Option[Double] =
+  for
+    myMean <- mean(xs)
+    varianceList = xs.map(x => (x-myMean)*(x-myMean))
+    finalVariance <- mean(varianceList)
+  yield
+    finalVariance
+    
 // Scroll up, to the Option object for Exercise 9
