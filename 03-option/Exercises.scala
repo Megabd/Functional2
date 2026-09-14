@@ -10,8 +10,13 @@ trait OrderedPoint
 
   this: java.awt.Point =>
 
-  override def compare(that: java.awt.Point): Int =
-    ???
+  override def compare(that: java.awt.Point): Int = 
+    if this.x > that.x then 1
+    else if this.x < that.x then -1
+    else if this.y > that.y then 1
+    else if this.y < that.y then -1
+    else 0
+
 
 // Try the following (and similar) tests in the repl (sbt console):
 //
@@ -32,25 +37,35 @@ object Tree:
 
   // Exercise 2
 
-  def size[A](t: Tree[A]): Int = ???
+  def size[A](t: Tree[A]): Int = t match
+    case Leaf(value) => 1
+    case Branch(left, right) => size(left) + size(right) + 1
+  
 
   // Exercise 3
 
-  def maximum(t: Tree[Int]): Int = ???
+  def maximum(t: Tree[Int]): Int = t match
+    case Leaf(value) => value
+    case Branch(left, right) => maximum(left) max maximum(right)
 
   // Exercise 4
 
-  def map[A, B](t: Tree[A])(f: A => B): Tree[B] = ???
+  def map[A, B](t: Tree[A])(f: A => B): Tree[B] = t match
+    case Leaf(value) => Leaf(f(value))
+    case Branch(left, right) =>Branch(map(left)(f), map(right)(f))
 
   // Exercise 5
 
-  def fold[A,B](t: Tree[A])(f: (B, B) => B)(g: A => B): B = ???
+  def fold[A,B](t: Tree[A])(f: (B, B) => B)(g: A => B): B = t match
+    case Leaf(value) => g(value)
+    case Branch(left, right) => f(fold(left)(f)(g), fold(right)(f)(g)) 
+  
 
-  def size1[A](t: Tree[A]): Int =  ???
+  def size1[A](t: Tree[A]): Int = fold[A, Int](t)((a, b) => a+b+1)(_ => 1)
 
-  def maximum1(t: Tree[Int]): Int = ???
+  def maximum1(t: Tree[Int]): Int = fold[Int, Int](t)((a,b) => a max b)(a => a)
 
-  def map1[A, B](t: Tree[A])(f: A => B): Tree[B] = ???
+  def map1[A, B](t: Tree[A])(f: A => B): Tree[B] = fold[A, Tree[B]](t)((a,b) => Branch(a,b))(a => Leaf(f(a)))
 
 
 
