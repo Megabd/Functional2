@@ -64,56 +64,62 @@ enum LazyList[+A]:
 
   // Exercise 2
 
-  def toList: List[A] = 
-    ???
+  def toList: List[A] = this match
+    case Empty => Nil
+    case Cons(h, t) => h()::t().toList 
+  
 
   // Test in the REPL, for instance: LazyList(1,2,3).toList 
   // (and see what list is constructed)
 
   // Exercise 3
+  // Our take function only ever creates one Cons and perhaps checks one if statement, containing the formular for the rest, but not forcing anything. Thus is matters not how large the number is.
+  // Drop does not force the head, but does force the tail, and toList forces both head and tail.
+  // So only the size of drop and toList matters.
 
-  def take(n: Int): LazyList[A] = 
-    ???
+  def take(n: Int): LazyList[A] = this match
+    case Empty => Empty
+    case Cons(h,t) => if n > 0 then Cons(h, () => t().take(n-1)) else Empty
 
-  def drop(n: Int): LazyList[A] = 
-    ???
+  def drop(n: Int): LazyList[A] = this match
+    case Empty => Empty
+    case Cons(h,t) => if n > 0 then t().drop(n-1) else Cons(h, t)
 
   // Exercise 4
-
-  def takeWhile(p: A => Boolean): LazyList[A] = 
-    ???
+  // Same structure as take. We check the if, we make the new lazyList, and the calculate nothing else until forced. So again the size of takeWhile matters not.
+  def takeWhile(p: A => Boolean): LazyList[A] = this match
+    case Empty => Empty
+    case Cons(h,t) => if p(h()) then Cons(h, () => t().takeWhile(p)) else Empty
 
   // Exercise 5
-  
-  def forAll(p: A => Boolean): Boolean =
-    ???
+  // If we dont know the answer, we could potentially keep going forever with a infinte list, since we force head and tail 
+  def forAll(p: A => Boolean): Boolean = this match
+    case Empty => true
+    case Cons(h,t) => if p(h()) then t().forAll(p) else false
  
   // Note 1. lazy; tail is never forced if satisfying element found this is
   // because || is non-strict
   // Note 2. this is also tail recursive (because of the special semantics
   // of ||)
-  def exists(p: A => Boolean): Boolean = 
-    ???
+  def exists(p: A => Boolean): Boolean = this match
+    case Empty => false
+    case Cons(h,t) => if p(h()) then true else t().exists(p)
 
   // Exercise 6
   
-  def takeWhile1(p: A => Boolean): LazyList[A] =
-    ???
+  def takeWhile1(p: A => Boolean): LazyList[A] = this.foldRight[LazyList[A], LazyList[A]](Empty) ((x,y) => if p(x) then cons(x,y) else Empty)
 
   // Exercise 7
   
-  def headOption1: Option[A] = 
-    ???
+  def headOption1: Option[A] = this.foldRight(None)((x, y) => Some(x))
 
   // Exercise 8
   
   // Note: The type is incorrect, you need to fix it
-  def map(f: Any): LazyList[Int] = 
-    ???
-
+  def map[B](f: A => B): LazyList[B] = this.foldRight[LazyList[B], LazyList[B]](Empty)((x, y) => cons(f(x), y))
+  
   // Note: The type is incorrect, you need to fix it
-  def filter(p: Any): LazyList[Any] = 
-    ???
+  def filter(p: A => Boolean): LazyList[A] = this.foldRight[LazyList[A], LazyList[A]](Empty)((x,y) => if p(x) then cons(x,y) else y)
 
   /* Note: The type is given correctly for append, because it is more complex.
    * Try to understand the type. The contsraint 'B >: A' requires that B is a
@@ -127,32 +133,42 @@ enum LazyList[+A]:
    * (creating a list of numbers).  Compare this with the definition of
    * getOrElse last week, and the type of foldRight this week.
    */
-  def append[B >: A](that: => LazyList[B]): LazyList[B] = 
-    ???
+  def append[B >: A](that: => LazyList[B]): LazyList[B] = this.foldRight[LazyList[B], LazyList[B]](that)((x,y) => cons(x,y))
 
   // Note: The type is incorrect, you need to fix it
-  def flatMap(f: Any): LazyList[Any] = 
-    ???
+  def flatMap[B](f: A => LazyList[B]): LazyList[B] = this.foldRight[LazyList[B], LazyList[B]](Empty)((x, y) => f(x).append(y))
 
   // Exercise 9
   // Type answer here
-  //
-  // ...
-  //
+  // Filter is lazy, do only the work required.
+  // HeadOption requires only a head
+  // So filter will go through the list until it finds a suitable head, and return it, doing no more work.
+  // In a strict list, filter would go through the entire list before headOption is even called
   // Scroll down to Exercise 10 in the companion object below
 
   // Exercise 13
 
-  def mapUnfold[B](f: A => B): LazyList[B] =
-    ???
+  def mapUnfold[B](f: A => B): LazyList[B] = unfold(this) {
+    case Empty =>
+      None
+    case Cons(h, t) =>
+      Some((f(h()), t()))
+  }
 
-  def takeUnfold(n: Int): LazyList[A] =
-    ???
+  def takeUnfold(n: Int): LazyList[A] = unfold((n, this)) {
+    case (remaining, Empty) =>
+      None
+    case (remaining, Cons(h, t)) =>
+      if remaining > 0 then Some((h(), (remaining - 1, t()))) else None
+  }
 
-  def takeWhileUnfold(p: A => Boolean): LazyList[A] =
-    ???
+  def takeWhileUnfold(p: A => Boolean): LazyList[A] = unfold(this) {
+    case Empty =>
+      None
+    case Cons(h, t) => if p(h()) then Some((h(), t())) else None
+  }
 
-  def zipWith[B >: A, C](ope: (=> B, => B) => C)(bs: LazyList[B]): LazyList[C] =
+  def zipWith[B >: A, C] (ope: (=> B, => B) => C) (bs: LazyList[B]): LazyList[C] = 
     ???
 
 end LazyList // enum ADT
@@ -177,32 +193,33 @@ object LazyList:
 
   // Exercise 1
 
-  def from(n: Int): LazyList[Int] =
-    ???
+  def from(n: Int): LazyList[Int] = cons(n, from(n+1))
 
-  def to(n: Int): LazyList[Int] =
-    ???
+  def to(n: Int): LazyList[Int] = cons(n, to(n-1))
 
-  lazy val naturals: LazyList[Int] =
-    ???
+  lazy val naturals: LazyList[Int] = from(1)
 
   // Scroll up to Exercise 2 to the enum LazyList definition 
   
   // Exercise 10
 
   // Note: The type is incorrect, you need to fix it
-  lazy val fibs: Any = 
-    ???
+  def fib(pre: Int, cur: Int): LazyList[Int] = cons(cur, fib(cur, pre+cur))
+
+  lazy val fibs: LazyList[Int] = cons(0, fib(0,1))
 
   // Exercise 11
 
   def unfold[A,S](z: S)(f: S => Option[(A, S)]): LazyList[A] =
-    ???
+    (for
+      (value, state) <- f(z)
+    yield
+      cons(value, unfold(state)(f))).getOrElse(Empty)
 
   // Exercise 12
 
   // Note: The type is incorrect, you need to fix it
-  lazy val fibsUnfold: Any = ???
+  lazy val fibsUnfold: LazyList[Int] = unfold((0,1))((x,y) => Some((x, (y,x+y))))
 
   // Scroll up for Exercise 13 to the enum
 
