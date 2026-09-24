@@ -5,6 +5,7 @@ package adpro.state
 
 import adpro.lazyList.LazyList
 import adpro.lazyList.LazyList.*
+import adpro.state.RNG.nonNegativeInt
 
 
 trait RNG:
@@ -29,28 +30,41 @@ object RNG:
   // Exercise 1
 
   def nonNegativeInt(rng: RNG): (Int, RNG) =
-    ???
+    val (number, nextRng) = rng.nextInt
+    val pos = if number == Int.MinValue then 0 else number.abs
+    (pos, nextRng)
+
 
   // Exercise 2
 
   def double(rng: RNG): (Double, RNG) = 
-    ???
+    val (number, nextRng) = nonNegativeInt(rng)
+    val myDouble = number.toDouble / (Int.MaxValue.toDouble+1.0)
+    (myDouble, nextRng)
 
   // Exercise 3
   
   // The return type is broken and needs to be fixed
-  def intDouble(rng: RNG): Any = 
-    ???
+  def intDouble(rng: RNG): ((Int, Double), RNG) = 
+    val (myInt, nextRNG) = nonNegativeInt(rng)
+    val (myDouble, nextRNG1) = double(nextRNG)
+    ((myInt, myDouble), nextRNG1)
 
   // The return type is broken and needs to be fixed
-  def doubleInt(rng: RNG): Any = 
-    ???
+  def doubleInt(rng: RNG): ((Double, Int), RNG) = 
+    val (myInt, nextRNG) = nonNegativeInt(rng)
+    val (myDouble, nextRNG1) = double(nextRNG)
+    ((myDouble, myInt), nextRNG1)
 
   // Exercise 4
 
   // The return type is broken and needs to be fixed
-  def ints(size: Int)(rng: RNG): Any = 
-    ???
+  def ints(size: Int)(rng: RNG): (List[Int], RNG) = 
+    def loop(remaining: Int, currentRng : RNG, currentList : List[Int]) : (List[Int], RNG) =
+      val (newValue, newRNG) = currentRng.nextInt
+      val newList = newValue :: currentList
+      if remaining <= 1 then (newList, newRNG) else loop(remaining-1, newRNG, newList)
+    loop(size, rng, Nil)
 
 
   type Rand[+A] = RNG => (A, RNG)
@@ -69,29 +83,32 @@ object RNG:
 
   // Exercise 5
 
-  lazy val double2: Rand[Double] = 
-    ???
+  lazy val double2: Rand[Double] = map(nonNegativeInt)(x => x.toDouble/(Int.MaxValue.toDouble+1.0))
 
   // Exercise 6
 
   def map2[A, B, C](ra: Rand[A], rb: Rand[B])(f: (A, B) => C): Rand[C] = 
-    ???
+    rng => {
+      val (a, rng2) = ra(rng)
+      val (b, rng3) = rb(rng2)
+      (f(a, b), rng3)
+    }
 
   // Exercise 7
 
-  def sequence[A](ras: List[Rand[A]]): Rand[List[A]] =
-    ??? 
+  def sequence[A](ras: List[Rand[A]]): Rand[List[A]] = ras.foldRight(unit(Nil)) ((generator, accumulatedGenerator) => map2(generator, accumulatedGenerator)((x, y) => x::y))
 
-  def ints2(size: Int): Rand[List[Int]] =
-    ???
+  def ints2(size: Int): Rand[List[Int]] = sequence(List.fill(size)(int))
 
   // Exercise 8
 
-  def flatMap[A,B](f: Rand[A])(g: A => Rand[B]): Rand[B] =
-    ???
+  def flatMap[A,B](f: Rand[A])(g: A => Rand[B]): Rand[B] =    
+    rng => {
+      val (a, nextRng) = f(rng)
+      g(a)(nextRng)
+    }
 
-  def nonNegativeLessThan(bound: Int): Rand[Int] =
-    ???
+  def nonNegativeLessThan(bound: Int): Rand[Int] = flatMap(nonNegativeInt)(x => unit(x % bound))
 
 end RNG
 
@@ -102,14 +119,25 @@ case class State[S, +A](run: S => (A, S)):
   // Exercise 9 (methods in class State)
   // Search for the second part (sequence) below
   
-  def flatMap[B](f: A => State[S, B]): State[S, B] = 
-    ???
+  def flatMap[B](f: A => State[S, B]): State[S, B] =
+  State { s =>
+    val (a, nextState) = this.run(s)
+    f(a).run(nextState)
+  }
+
 
   def map[B](f: A => B): State[S, B] = 
-    ???
+  State { s =>
+    val (a, nextState) = this.run(s)
+    (f(a), nextState)
+  }
 
   def map2[B,C](sb: State[S, B])(f: (A, B) => C): State[S, C] = 
-    ???
+  State { s =>
+    val (a, nextState) = this.run(s)
+    val (b, nextState1) = sb.run(nextState)
+    (f(a,b), nextState1)
+  }
 
 
 object State:
@@ -132,22 +160,20 @@ object State:
 
   // Exercise 9 (sequence, continued)
  
-  def sequence[S,A](sas: List[State[S, A]]): State[S, List[A]] =
-    ???
+  def sequence[S,A](sas: List[State[S, A]]): State[S, List[A]] = sas.foldRight(unit(Nil)) ((generator, accumulatedGenerator) => generator.map2(accumulatedGenerator)((x, y) => x::y))
 
   import adpro.lazyList.LazyList
 
   // Exercise 10 (stateToLazyList)
   
-  def stateToLazyList[S, A](s: State[S,A])(initial: S): LazyList[A] =
-    ???
+  def stateToLazyList[S, A](s: State[S,A])(initial: S): LazyList[A] = 
+    val (a, nextState) = s.run(initial)
+    cons(a, stateToLazyList(s)(nextState))
 
   // Exercise 11 (lazyInts out of stateToLazyList)
   
-  def lazyInts(rng: RNG): LazyList[Int] = 
-    ???
+  def lazyInts(rng: RNG): LazyList[Int] = stateToLazyList(State[RNG, Int] {s => s.nextInt})(rng)
 
-  lazy val tenStrictInts: List[Int] = 
-    ???
+  lazy val tenStrictInts: List[Int] = lazyInts(RNG.SimpleRNG(42)).take(10).toList
 
 end State

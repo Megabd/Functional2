@@ -1,7 +1,7 @@
 // Advanced Programming, A. Wąsowski, IT University of Copenhagen
 // Based on Functional Programming in Scala, 2nd Edition
 
-package adpro.state.solution
+package adpro.state
 
 import org.scalacheck.*
 import org.scalacheck.Arbitrary.arbitrary
