@@ -175,17 +175,15 @@ trait Parsers[ParseError, Parser[+_]]:
   // Exercise 1
 
   extension [A](p1: Parser[A])
-    def map2[B, C](p2: => Parser[B]) (f: (A, B) => C): Parser[C] =
-      ???
+    def map2[B, C](p2: => Parser[B]) (f: (A, B) => C): Parser[C] = p1.flatMap{x => p2.flatMap{y => succeed(f(x,y))}}
 
-    def product[B] (p2: => Parser[B]): Parser[(A,B)] =
-      ???
+    def product[B] (p2: => Parser[B]): Parser[(A,B)] = p1.flatMap{x => p2.flatMap{y => succeed((x,y))}}
 
     // Write here:
     //
-    // (1) ...
+    // (1) Both functions are extension methods on Parser[A]. Therefore, the type parameter A is already declared in the extension signature and does not need to be declared again in each method.
     //
-    // (2) ...
+    // (2) The second argument is passed by-name to delay its evaluation until needed.
 
     def **[B](p2: => Parser[B]): Parser[(A, B)] =
       p1.product(p2)
@@ -202,39 +200,34 @@ trait Parsers[ParseError, Parser[+_]]:
   // Exercise 2
 
   extension [A](p: Parser[A])
-    def many: Parser[List[A]] =
-      ???
+    def many: Parser[List[A]] = p.map2(p.many)((head, tail) => head :: tail).or(succeed(List.empty[A]))
 
   // Exercise 3
 
   extension [A](p: Parser[A])
-    def map[B](f: A => B): Parser[B] =
-      ???
+    def map[B](f: A => B): Parser[B] = p.flatMap{x => succeed(f(x))}
 
   // Exercise 4
 
   // A better name would be: howManyA
-  def manyA: Parser[Int] =
-    ???
+  def manyA: Parser[Int] = char('a').many.map(x => x.length)
 
   // Exercise 5
 
   extension [A](p: Parser[A])
-    def many1: Parser[List[A]] =
-      ???
+    def many1: Parser[List[A]] = p.map2(p.many)((head, tail) => head :: tail)
 
-  // Write here ...
+  // Many1 needs to work on any parser, so we need access to p. ManyA we create the parser ourselves
 
   // Exercise 6
 
   extension [A](p: Parser[A])
-    def listOfN(n: Int): Parser[List[A]] =
-      ???
-
+    def listOfN(n: Int): Parser[List[A]] = if n <= 0 then succeed(List.empty[A]) else p.map2(p.listOfN(n - 1))((x, y) => x :: y)
   // Exercise 7
 
-  def digitTimesA: Parser[Int] =
-    ???
+  def digitTimesA: Parser[Int] = regex("[0-9]".r).flatMap { digit => 
+    val n = digit.toInt
+    regex(s"a{$n}".r).map(_ => n)}
 
   // For Exercise 8 read the code below until you find it.
 
@@ -414,8 +407,7 @@ object Sliceable
   // Exercise 8
 
   /** Consume no characters and succeed with the given value */
-  def succeed[A](a: A): Parser[A] =
-    ???
+  def succeed[A](a: A): Parser[A] = (s: ParseState) => Success(a, 0)
 
   // For Exercise 9 continue reading below
 
@@ -475,13 +467,20 @@ object Sliceable
   // Exercise 9
 
   extension [A](p: Parser[A])
-    def or(p2: => Parser[A]): Parser[A] =
-      ???
+    def or(p2: => Parser[A]): Parser[A] = (s: ParseState) =>
+      p(s) match
+        case Success(a, n) => Success(a, n)
+        case Slice(n) => Slice(n)
+        case Failure(n, isCommitted) => p2(s)
+
+      
 
   // Exercise 10
 
   def regex(r: Regex): Parser[String] = (s: ParseState) =>
-    ???
+    r.findPrefixOf(s.input) match
+      case Some(matched) => if s.isSliced then Slice(matched.length) else Success(matched, matched.length)
+      case None => Failure(s.loc.toError(s"Expected regex: $r"), false)
 
 end Sliceable
 
@@ -508,47 +507,51 @@ class JSONParser[ParseError, Parser[+_]](P: Parsers[ParseError,Parser]):
   // Exercise 11
 
   lazy val QUOTED: Parser[String] =
-    ???
-
+    regex("\"[^\"]*\"".r).map(s => s.substring(1, s.length - 1))
+  // Used chat for the regex in this one, god damn
   lazy val DOUBLE: Parser[Double] =
-    ???
+    regex("""-?[0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?""".r).map(s => s.toDouble)
 
   lazy val ws: Parser[Unit] =
-    ???
+    regex("""\s+""".r).map(_ => ())
 
-  // Exercise 13
+  // Exercise 12
 
   lazy val jnull: Parser[JSON] =
-    ???
+    string("null").map(_ => JNull)
 
   lazy val jbool: Parser[JSON] =
-    ???
+    string("true").map(_ => JBool(true)) |
+    string("false").map(_ => JBool(false))
 
   lazy val jstring: Parser[JString] =
-    ???
+    QUOTED.map(s => JString(s))
 
   lazy val jnumber: Parser[JNumber] =
-    ???
+    DOUBLE.map(n => JNumber(n))
 
   // Exercise 13
 
   private lazy val commaSeparatedVals: Parser[List[JSON]] =
-    ???
+    json.map2((char(',') |* json).many)((x, y) => x :: y)
+      .or(succeed(List.empty[JSON]))
 
   lazy val jarray: Parser[JArray] =
-    ???
+    ((char('[') |* ws.? |* commaSeparatedVals) *| char(']') *| ws.?)
+      .map(x => JArray(x.toVector))
 
-  lazy val field: Parser[(String,JSON)] =
-    ???
+  lazy val field: Parser[(String, JSON)] =
+    (QUOTED *| ws.? *| char(':')) ** json
 
-  private lazy val commaSeparatedFields: Parser[List[(String,JSON)]] =
-    ???
+  private lazy val commaSeparatedFields: Parser[List[(String, JSON)]] =
+    field.map2((char(',') |* ws.? |* field).many)((x, y) => x :: y)
+      .or(succeed(List.empty[(String, JSON)]))
 
   lazy val jobject: Parser[JObject] =
-    ???
+    ((char('{') |* ws.? |* commaSeparatedFields) *| char('}') *| ws.?)
+      .map(x => JObject(x.toMap))
 
-  lazy val json: Parser[JSON] =
-    ???
+  lazy val json: Parser[JSON] = (ws.? |* (jnull | jbool | jstring | jnumber | jarray | jobject)) *| ws.?
 
   // Exercise 14 (no code)
 
@@ -556,8 +559,7 @@ class JSONParser[ParseError, Parser[+_]](P: Parsers[ParseError,Parser]):
   //
   // Write here:
   //
-  // (1) ...
-  //
-  // (2) ...
+  // (1) The laws only use methods defined in Parsers, so they don't need to know how the methods are actually implemented.
+  // (2) The advantage is that we can use the same laws to test different implementations, without having to write new tests for each.
 
 end JSONParser

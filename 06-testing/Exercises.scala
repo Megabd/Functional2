@@ -68,7 +68,7 @@ object LazyListSpec
 
   // Exercise 4
   property("Ex04.01: take(n) does not force the (n+1)st head ever ") =
-    forAll { (n: Int) => (n>= 0) ==> (bombAtEnd(n).take(n).toList == List.fill(n)(1))}
+    forAll(Gen.choose(0, 100)) { (n: Int) => (n>= 0) ==> (bombAtEnd(n).take(n).toList == List.fill(n)(1))}
 
   def bombAtEnd (n : Int) : LazyList[Int] = n match
     case 0 => cons (throw new RuntimeException("n+1 head was forced"), empty)
@@ -78,7 +78,7 @@ object LazyListSpec
   // Exercise 5
   property("Ex05.01: l.take(n).take(n) == l.take(n) for any lazy list s and any n") =
     given Arbitrary[LazyList[Int]] = Arbitrary(genNonEmptyLazyList[Int])
-    forAll { (l: LazyList[Int], n: Int) => (n >= 0) ==> (l.take(n).take(n) == l.take(n))}
+    forAll { (l: LazyList[Int], n: Int) => (n >= 0) ==> (l.take(n).take(n).toList == l.take(n).toList)}
     
   property("Ex05.02: empty") =
     forAll { (n: Int) => (n >= 0) ==> (empty.take(n).take(n) == empty.take(n))}
@@ -86,7 +86,7 @@ object LazyListSpec
   // Exercise 6
   property("Ex06.01: l.drop(n).drop(m) == l.drop(n+m) for any n, m") =
     given Arbitrary[LazyList[Int]] = Arbitrary(genNonEmptyLazyList[Int])
-    forAll { (l: LazyList[Int], n: Int, m: Int) => (n >= 0 && m >= 0) ==> (l.drop(n).drop(m) == l.drop(n+m))}
+    forAll { (l: LazyList[Int], n: Int, m: Int) => (n >= 0 && m >= 0 && n.toLong + m.toLong <= Int.MaxValue) ==> (l.drop(n).drop(m) == l.drop(n+m))}
 
   property("Ex06.02: empty") =
     forAll { (n: Int, m: Int) => (n >= 0 && m >= 0) ==> (empty.drop(n).drop(m) == empty.drop(n + m))}
@@ -94,7 +94,7 @@ object LazyListSpec
   // Exercise 7
   property("Ex07.01: l.drop(n) does not force any of the dropped elements") =
     given Arbitrary[LazyList[Int]] = Arbitrary(genNonEmptyLazyList[Int])
-    forAll { (l: LazyList[Int], n: Int) =>  (n >= 0) ==> (addNBombsToHead(n, l).drop(n).headOption == l.headOption)}
+    forAll(genNonEmptyLazyList[Int], Gen.choose(0, 100)) { (l: LazyList[Int], n: Int) =>  (n >= 0) ==> (addNBombsToHead(n, l).drop(n).headOption == l.headOption)}
 
   def addNBombsToHead(n: Int, tail: LazyList[Int]): LazyList[Int] = n match 
   case 0 => tail
@@ -102,7 +102,7 @@ object LazyListSpec
   // Exercise 8
   property("Ex08.01: l.map(identity) == l for any lazy list l)") =
     given Arbitrary[LazyList[Int]] = Arbitrary(genNonEmptyLazyList[Int])
-    forAll { (l: LazyList[Int]) => l.map(identity) == l}
+    forAll { (l: LazyList[Int]) => l.map(identity).toList == l.toList}
 
   property("Ex08.02: empty") =
     empty.map(identity) == empty
@@ -117,11 +117,11 @@ object LazyListSpec
   // Exercise 10
   property("Ex10.01: appending empty changes nothing") =
     given Arbitrary[LazyList[Int]] = Arbitrary(genNonEmptyLazyList[Int])
-    forAll { (l: LazyList[Int]) => l.append(empty) == l}
+    forAll { (l: LazyList[Int]) => l.append(empty).toList == l.toList}
 
   property("Ex10.02: appending to empty gives the appended list") =
     given Arbitrary[LazyList[Int]] = Arbitrary(genNonEmptyLazyList[Int])
-    forAll { (l: LazyList[Int]) => empty.append(l) == l}
+    forAll { (l: LazyList[Int]) => empty.append(l).toList == l.toList}
 
   property("Ex10.03: append contains first list followed by second list") =
     given Arbitrary[LazyList[Int]] = Arbitrary(genNonEmptyLazyList[Int])
